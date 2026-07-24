@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aguardando aprovação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .pending-card {
+    position: relative;
+    z-index: 1;
+    max-width: 460px;
+    text-align: center;
+    background: var(--plum-900);
+    border: 1px solid rgba(232, 180, 188, 0.12);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 52px 40px;
+  }
+  .pending-icon {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 2px solid var(--gold-500);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 22px;
+    color: var(--gold-300);
+    font-family: "Fraunces", serif;
+    font-size: 22px;
+  }
+  .pending-card h1 { font-size: 26px; margin: 0 0 12px; }
+  .pending-card p { color: var(--muted-400); font-size: 14.5px; line-height: 1.6; margin: 0 0 28px; }
+  .logout-btn {
+    background: transparent;
+    border: 1px solid rgba(232,180,188,0.25);
+    color: var(--rose-200);
+    padding: 11px 22px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .logout-btn:hover { border-color: var(--gold-500); color: var(--gold-300); }
+</style>
+</head>
+<body>
+
+<svg class="vine-bg" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="vineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#e8b4bc"/>
+    </linearGradient>
+  </defs>
+  <path d="M -20,650 C 120,600 80,480 200,430 C 320,380 260,280 380,220 C 480,170 460,90 600,60 C 700,40 780,80 920,40" />
+</svg>
+
+<div class="pending-card">
+  <div class="pending-icon">⏳</div>
+  <h1>Quase lá</h1>
+  <p>Sua conta foi criada com sucesso, mas ainda está aguardando aprovação. Assim que for liberada, você vai poder entrar normalmente por aqui.</p>
+  <button class="logout-btn" id="logout-btn">Sair</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+  function safeRedirect(url) {
+    const key = "redirect_guard";
+    const now = Date.now();
+    let last;
+    try { last = JSON.parse(sessionStorage.getItem(key) || "{}"); } catch { last = {}; }
+    if (!last.time || now - last.time > 4000) last = { count: 0, time: now };
+    last.count = (last.count || 0) + 1;
+    last.time = now;
+    sessionStorage.setItem(key, JSON.stringify(last));
+    if (last.count > 4) {
+      sessionStorage.removeItem(key);
+      document.body.innerHTML = `<div style="max-width:420px;margin:80px auto;text-align:center;font-family:Inter,sans-serif;color:#f1f5ff;padding:0 20px"><p style="font-size:15px;line-height:1.6">Algo travou na sessão. Isso costuma resolver limpando os dados salvos do site.</p><a href="index.html" style="color:#a78bfa">Voltar para o login</a></div>`;
+      return;
+    }
+    window.location.replace(url);
+  }
+
+  // Se não tiver sessão, manda pro login
+  (async function guard() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (!data.session) {
+      safeRedirect("index.html");
+      return;
+    }
+    // Se já foi aprovado, manda pra home
+    const { data: profile } = await supabaseClient
+      .from("profiles")
+      .select("approved")
+      .eq("id", data.session.user.id)
+      .single();
+    if (profile?.approved) safeRedirect("home.html");
+  })();
+
+  document.getElementById("logout-btn").addEventListener("click", async () => {
+    await supabaseClient.auth.signOut();
+    sessionStorage.removeItem("redirect_guard");
+    window.location.replace("index.html");
+  });
+</script>
+</body>
+</html>
